@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - AWS FinOps Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-shield-lock text-primary" style="font-size: 3rem;"></i>
+                        <h2 class="mt-3 mb-1">Secure Login</h2>
+                        <p class="text-muted">Enter your credentials to access the dashboard</p>
+                    </div>
+                    
+                    <form method="post" data-validate novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="id_email" class="form-label">Email Address</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-envelope"></i>
+                                </span>
+                                <input type="email" 
+                                       class="form-control" 
+                                       id="id_email" 
+                                       name="email" 
+                                       placeholder="Enter your email"
+                                       autocomplete="email"
+                                       required>
+                                <div class="invalid-feedback">
+                                    Please provide a valid email address.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_password" class="form-label">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-key"></i>
+                                </span>
+                                <input type="password" 
+                                       class="form-control" 
+                                       id="id_password" 
+                                       name="password" 
+                                       placeholder="Enter your password"
+                                       autocomplete="current-password"
+                                       required>
+                                <div class="invalid-feedback">
+                                    Please provide your password.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" 
+                                   class="form-check-input" 
+                                   id="id_remember_me" 
+                                   name="remember_me">
+                            <label class="form-check-label" for="id_remember_me">
+                                Remember me for 30 days
+                            </label>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-box-arrow-in-right"></i>
+                                Sign In
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <small class="text-muted">
+                            <i class="bi bi-shield-check text-success"></i>
+                            Your connection is secure and encrypted
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Security Notice -->
+            <div class="alert alert-info mt-3" role="alert">
+                <div class="d-flex">
+                    <div class="flex-shrink-0">
+                        <i class="bi bi-info-circle"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="alert-heading">Security Notice</h6>
+                        <p class="mb-0">
+                            This system implements enterprise-level security including multi-factor authentication, 
+                            rate limiting, and comprehensive audit logging. Failed login attempts are monitored 
+                            and accounts may be temporarily locked for security.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Enhanced form validation
+    const form = document.querySelector('form[data-validate]');
+    const emailInput = document.getElementById('id_email');
+    const passwordInput = document.getElementById('id_password');
+    
+    // Real-time email validation
+    emailInput.addEventListener('blur', function() {
+        const email = this.value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (email && !emailRegex.test(email)) {
+            this.setCustomValidity('Please enter a valid email address');
+            this.classList.add('is-invalid');
+        } else {
+            this.setCustomValidity('');
+            this.classList.remove('is-invalid');
+            if (email) this.classList.add('is-valid');
+        }
+    });
+    
+    // Password strength indicator
+    passwordInput.addEventListener('input', function() {
+        const password = this.value;
+        const minLength = 8;
+        
+        if (password.length >= minLength) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else if (password.length > 0) {
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+        }
+    });
+    
+    // Form submission handling
+    form.addEventListener('submit', function(e) {
+        // Show loading state
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading-spinner me-2"></span>Signing In...';
+        
+        // Re-enable button after 5 seconds in case of network issues
+        setTimeout(function() {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }, 5000);
+    });
+});
+</script>
+{% endblock %}

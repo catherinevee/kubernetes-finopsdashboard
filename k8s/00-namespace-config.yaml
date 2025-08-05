@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finops-dashboard
+  labels:
+    name: finops-dashboard
+    app.kubernetes.io/name: finops-dashboard
+    app.kubernetes.io/version: "1.0.0"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finops-config
+  namespace: finops-dashboard
+data:
+  DEBUG: "False"
+  ALLOWED_HOSTS: "finops-dashboard.example.com,localhost"
+  DATABASE_NAME: "finops_dashboard"
+  DATABASE_USER: "finops_user"
+  DATABASE_HOST: "postgres-service"
+  DATABASE_PORT: "5432"
+  CELERY_BROKER_URL: "redis://redis-service:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis-service:6379/0"
+  LOG_LEVEL: "INFO"
+  SECURE_SSL_REDIRECT: "True"
+  SESSION_COOKIE_SECURE: "True"
+  CSRF_COOKIE_SECURE: "True"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: finops-secrets
+  namespace: finops-dashboard
+type: Opaque
+data:
+  # Base64 encoded secrets - Replace with actual values
+  SECRET_KEY: eW91ci1zZWNyZXQta2V5LWNoYW5nZS1pbi1wcm9kdWN0aW9u # your-secret-key-change-in-production
+  DATABASE_PASSWORD: Zmlub3BzX3Bhc3N3b3Jk # finops_password
+  REDIS_PASSWORD: cmVkaXNfcGFzc3dvcmQ= # redis_password
+  OAUTH2_CLIENT_SECRET: b2F1dGgyLWNsaWVudC1zZWNyZXQ= # oauth2-client-secret
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: finops-dashboard
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: finops-dashboard
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: fast-ssd
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: static-files-pvc
+  namespace: finops-dashboard
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: shared-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: media-files-pvc
+  namespace: finops-dashboard
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: shared-storage
