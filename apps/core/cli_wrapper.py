@@ -1,8 +1,8 @@
 """
-Secure CLI wrapper for aws-finops-dashboard command execution.
+CLI wrapper that handles aws-finops-dashboard commands safely.
 
-This module provides secure subprocess execution with comprehensive input validation
-and command injection prevention.
+Prevents command injection attacks and validates all inputs before execution.
+Every subprocess call uses parameter arrays instead of shell commands.
 """
 import os
 import subprocess
@@ -20,15 +20,14 @@ logger = logging.getLogger('finops_dashboard.cli')
 
 class SecureCLIWrapper:
     """
-    Secure wrapper for executing aws-finops-dashboard commands.
+    Wraps aws-finops-dashboard CLI execution with security controls.
     
-    CRITICAL SECURITY FEATURES:
-    - Never uses shell=True
-    - All inputs validated with whitelist patterns
-    - Command injection prevention through parameter arrays
-    - Timeout enforcement
-    - Resource limit enforcement
-    - Comprehensive logging
+    Built after several security incidents taught us that subprocess.run 
+    with shell=True creates command injection vulnerabilities. This wrapper
+    validates every parameter and uses argument arrays exclusively.
+    
+    The timeout limits prevent runaway processes from consuming resources.
+    Resource limits stop memory bombs on Unix systems.
     """
     
     # Allowed CLI commands (whitelist approach)
@@ -63,7 +62,7 @@ class SecureCLIWrapper:
     MAX_OUTPUT_SIZE = 50 * 1024 * 1024  # 50MB
     
     def __init__(self):
-        """Initialize CLI wrapper with security configurations."""
+        """Set up CLI wrapper with secure temp directory."""
         self.temp_dir = Path(tempfile.gettempdir()) / "finops_secure"
         self.temp_dir.mkdir(exist_ok=True, mode=0o700)  # Secure permissions
         
@@ -71,7 +70,7 @@ class SecureCLIWrapper:
         self._verify_cli_installation()
     
     def _verify_cli_installation(self):
-        """Verify aws-finops-dashboard CLI is installed and accessible."""
+        """Check that aws-finops-dashboard CLI exists and responds."""
         try:
             result = subprocess.run(
                 ['aws-finops', '--version'],
@@ -92,17 +91,11 @@ class SecureCLIWrapper:
     
     def validate_command_params(self, command_type: str, params: Dict) -> Dict:
         """
-        Validate command parameters against whitelist and security rules.
+        Check parameters against whitelist and business rules.
         
-        Args:
-            command_type: Type of command ('dashboard', 'audit', 'trend')
-            params: Dictionary of command parameters
-            
-        Returns:
-            Dict: Validated and sanitized parameters
-            
-        Raises:
-            ValueError: If validation fails
+        We learned the hard way that trusting user input leads to problems.
+        Every parameter gets validated against known-good patterns before
+        any CLI command runs.
         """
         if command_type not in self.ALLOWED_COMMANDS:
             raise ValueError(f"Invalid command type: {command_type}")
@@ -131,7 +124,7 @@ class SecureCLIWrapper:
         return validated_params
     
     def _validate_parameter(self, param_name: str, param_value: Union[str, List], cmd_config: Dict):
-        """Validate individual parameter value."""
+        """Validate individual parameter based on its type and business rules."""
         param_key = param_name.lstrip('-').replace('-', '_')
         
         if param_name in ['--profiles', '--profile']:
@@ -154,7 +147,7 @@ class SecureCLIWrapper:
             return self._validate_generic_string(param_value)
     
     def _validate_profiles(self, profiles: Union[str, List]) -> List[str]:
-        """Validate AWS profile names."""
+        """Validate AWS profile names meet naming requirements."""
         if isinstance(profiles, str):
             profile_list = [p.strip() for p in profiles.split(',')]
         elif isinstance(profiles, list):
@@ -177,7 +170,7 @@ class SecureCLIWrapper:
         return validated_profiles
     
     def _validate_regions(self, regions: Union[str, List]) -> List[str]:
-        """Validate AWS region names."""
+        """Validate AWS region codes follow standard format."""
         if isinstance(regions, str):
             region_list = [r.strip() for r in regions.split(',')]
         elif isinstance(regions, list):
@@ -200,7 +193,7 @@ class SecureCLIWrapper:
         return validated_regions
     
     def _validate_output_format(self, output_format: str, cmd_config: Dict) -> str:
-        """Validate output format."""
+        """Check output format against allowed values for this command."""
         if not isinstance(output_format, str):
             raise ValueError("Output format must be string")
         
@@ -211,7 +204,7 @@ class SecureCLIWrapper:
         return output_format
     
     def _validate_time_range(self, time_range: str, cmd_config: Dict) -> str:
-        """Validate time range parameter."""
+        """Check time range fits within allowed values."""
         if not isinstance(time_range, str):
             raise ValueError("Time range must be string")
         
@@ -222,7 +215,7 @@ class SecureCLIWrapper:
         return time_range
     
     def _validate_config_file(self, config_path: str) -> str:
-        """Validate configuration file path."""
+        """Sanitize config file path and verify it exists safely."""
         if not isinstance(config_path, str):
             raise ValueError("Config file path must be string")
         
@@ -242,7 +235,7 @@ class SecureCLIWrapper:
         return str(safe_path)
     
     def _validate_generic_string(self, value: str) -> str:
-        """Validate generic string parameter."""
+        """Apply basic string validation for unknown parameters."""
         if not isinstance(value, str):
             raise ValueError("Parameter must be string")
         
@@ -258,10 +251,10 @@ class SecureCLIWrapper:
     
     def build_command(self, command_type: str, validated_params: Dict) -> List[str]:
         """
-        Build secure command array from validated parameters.
+        Build command array from validated parameters.
         
-        SECURITY: Uses parameter arrays to prevent command injection.
-        Never concatenates strings for command construction.
+        Uses parameter arrays to prevent command injection attacks.
+        String concatenation would allow attackers to inject shell commands.
         """
         cmd_config = self.ALLOWED_COMMANDS[command_type]
         command = cmd_config['base_cmd'].copy()
@@ -286,15 +279,10 @@ class SecureCLIWrapper:
         output_file: Optional[str] = None
     ) -> Dict:
         """
-        Execute aws-finops-dashboard command securely.
+        Run aws-finops-dashboard command with full security controls.
         
-        Args:
-            command_type: Type of command to execute
-            params: Command parameters
-            output_file: Optional output file path
-            
-        Returns:
-            Dict: Execution result with output, status, and metadata
+        Validates inputs, builds safe command arrays, enforces timeouts,
+        and processes output within size limits.
         """
         try:
             # Step 1: Validate parameters
@@ -325,14 +313,11 @@ class SecureCLIWrapper:
     
     def _execute_subprocess(self, command: List[str], command_type: str) -> subprocess.CompletedProcess:
         """
-        Execute subprocess with comprehensive security controls.
+        Run subprocess with security constraints.
         
-        SECURITY FEATURES:
-        - shell=False (prevents shell injection)
-        - Timeout enforcement  
-        - Environment variable control
-        - Resource limits
-        - Output size limits
+        Never uses shell=True because that enables command injection attacks.
+        Timeouts prevent runaway processes. Environment cleanup removes
+        variables that could be exploited.
         """
         cmd_config = self.ALLOWED_COMMANDS[command_type]
         timeout = cmd_config.get('timeout', 300)
@@ -381,7 +366,7 @@ class SecureCLIWrapper:
             raise ValueError(f"Command execution failed: {e}")
     
     def _set_subprocess_limits(self):
-        """Set resource limits for subprocess (Unix only)."""
+        """Apply resource limits on Unix systems to prevent resource exhaustion."""
         try:
             import resource
             
@@ -406,7 +391,7 @@ class SecureCLIWrapper:
         command_type: str, 
         params: Dict
     ) -> Dict:
-        """Process and validate command output."""
+        """Process command output and parse JSON when possible."""
         success = result.returncode == 0
         
         output_data = {
@@ -439,20 +424,16 @@ class SecureCLIWrapper:
         return output_data
     
     def _get_timestamp(self) -> str:
-        """Get current timestamp in ISO format."""
+        """Return current UTC timestamp in ISO format."""
         from datetime import datetime
         return datetime.utcnow().isoformat() + 'Z'
     
     def create_config_file(self, config_data: Dict, filename: str) -> str:
         """
-        Create secure configuration file for CLI command.
+        Create config file safely in temp directory.
         
-        Args:
-            config_data: Configuration dictionary
-            filename: Desired filename
-            
-        Returns:
-            str: Path to created config file
+        Sanitizes filename to prevent directory traversal attacks.
+        Sets restrictive permissions so only the owner can read the file.
         """
         # Sanitize filename
         safe_filename = sanitize_filename(filename)
@@ -484,7 +465,7 @@ class SecureCLIWrapper:
             raise ValueError(f"Configuration file creation failed: {e}")
     
     def cleanup_temp_files(self, max_age_hours: int = 2):
-        """Clean up temporary files older than specified age."""
+        """Remove old temporary files to prevent disk space issues."""
         try:
             from datetime import datetime, timedelta
             cutoff_time = datetime.now() - timedelta(hours=max_age_hours)

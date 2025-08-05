@@ -1,5 +1,5 @@
 """
-Secure authentication views with MFA support and comprehensive security controls.
+Authentication views with rate limiting and account lockout.
 """
 import logging
 from datetime import timedelta
@@ -82,7 +82,7 @@ class MFAVerifyRequest(BaseModel):
 @ratelimit(key='ip', rate='5/m', method='POST', block=True)
 @require_http_methods(["GET", "POST"])
 def login_view(request):
-    """Secure login view with rate limiting and comprehensive logging."""
+    """Handle user login with rate limiting and failed attempt tracking."""
     if request.user.is_authenticated:
         return redirect('dashboard:home')
     
@@ -197,7 +197,7 @@ def login_view(request):
 @ratelimit(key='ip', rate='3/m', method='POST', block=True)
 @require_http_methods(["GET", "POST"])
 def mfa_verify_view(request):
-    """MFA verification view."""
+    """Second factor authentication for users with MFA enabled."""
     # Check if user has passed first factor
     user_id = request.session.get('pre_2fa_user_id')
     session_ip = request.session.get('pre_2fa_ip')
@@ -256,7 +256,7 @@ def mfa_verify_view(request):
 @csrf_protect
 @require_http_methods(["POST"])
 def logout_view(request):
-    """Secure logout with session cleanup."""
+    """Log user out and clean up sessions and tokens."""
     user_email = request.user.email
     ip_address = get_client_ip(request)
     
@@ -274,7 +274,7 @@ def logout_view(request):
 @permission_classes([AllowAny])
 @ratelimit(key='ip', rate='10/h', method='POST', block=True)
 def api_login(request):
-    """API login endpoint returning OAuth2 token."""
+    """API endpoint that returns OAuth2 token for authenticated users."""
     try:
         login_data = LoginRequest(**request.data)
         
@@ -342,7 +342,7 @@ def api_login(request):
 @otp_required
 @csrf_protect
 def mfa_setup_view(request):
-    """MFA setup view for TOTP devices."""
+    """Let users configure TOTP authenticator apps."""
     if request.method == 'POST':
         form = MFASetupForm(request.POST)
         if form.is_valid():

@@ -1,5 +1,5 @@
 """
-AWS Profile models for secure credential and region management.
+AWS profile models for credential and region management.
 """
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -12,7 +12,7 @@ User = get_user_model()
 
 
 class AWSProfile(models.Model):
-    """AWS profile configuration with secure credential handling."""
+    """AWS account configuration and access settings."""
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(
@@ -84,7 +84,7 @@ class AWSProfile(models.Model):
         return f"{self.name} ({self.account_id})"
     
     def clean(self):
-        """Validate profile configuration."""
+        """Validate profile settings before saving."""
         from django.core.exceptions import ValidationError
         from apps.authentication.utils import validate_aws_identifier
         
@@ -106,7 +106,7 @@ class AWSProfile(models.Model):
                 raise ValidationError(f"Invalid region '{region}': {e}")
     
     def can_be_used_by(self, user):
-        """Check if user has permission to use this profile."""
+        """Return True if user has access to this profile."""
         if self.user == user:
             return True
         if self.is_shared and user in self.allowed_users.all():
@@ -114,19 +114,19 @@ class AWSProfile(models.Model):
         return False
     
     def update_last_used(self):
-        """Update last used timestamp."""
+        """Mark profile as recently used."""
         self.last_used = timezone.now()
         self.save(update_fields=['last_used'])
     
     def get_regions_display(self):
-        """Get formatted regions for display."""
+        """Format region list for UI display."""
         if not self.regions:
             return self.default_region
         return ', '.join(self.regions)
 
 
 class ProfileUsageLog(models.Model):
-    """Track profile usage for auditing and billing purposes."""
+    """Track when profiles are used for billing and auditing."""
     
     profile = models.ForeignKey(AWSProfile, on_delete=models.CASCADE, related_name='usage_logs')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -151,7 +151,7 @@ class ProfileUsageLog(models.Model):
 
 
 class AWSCredential(models.Model):
-    """Encrypted AWS credentials with rotation support."""
+    """Encrypted AWS credentials with automatic rotation."""
     
     CREDENTIAL_TYPES = [
         ('iam_role', 'IAM Role (Recommended)'),
@@ -185,13 +185,13 @@ class AWSCredential(models.Model):
         return f"{self.profile.name} credentials ({self.credential_type})"
     
     def is_expired(self):
-        """Check if credentials are expired."""
+        """Return True if these credentials have expired."""
         if not self.expires_at:
             return False
         return timezone.now() > self.expires_at
     
     def needs_rotation(self):
-        """Check if credentials need rotation."""
+        """Return True if credentials should be rotated soon."""
         if not self.auto_rotate:
             return False
         
@@ -206,7 +206,7 @@ class AWSCredential(models.Model):
 
 
 class RegionConfiguration(models.Model):
-    """AWS region-specific configuration and status."""
+    """AWS region settings and health status."""
     
     region = models.CharField(
         max_length=20,
@@ -240,7 +240,7 @@ class RegionConfiguration(models.Model):
 
 
 class ProfileTemplate(models.Model):
-    """Templates for common AWS profile configurations."""
+    """Reusable AWS profile configurations."""
     
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField()
@@ -264,6 +264,6 @@ class ProfileTemplate(models.Model):
         return self.name
     
     def increment_usage(self):
-        """Increment usage counter."""
+        """Track how often this template gets used."""
         self.usage_count += 1
         self.save(update_fields=['usage_count'])

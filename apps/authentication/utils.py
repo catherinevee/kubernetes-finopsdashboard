@@ -1,5 +1,5 @@
 """
-Authentication utility functions for security operations.
+Helper functions for authentication and security.
 """
 import re
 import logging
@@ -14,7 +14,10 @@ logger = logging.getLogger('finops_dashboard.auth')
 
 def get_client_ip(request) -> str:
     """
-    Extract client IP address from request, handling proxies and load balancers.
+    Get real client IP from request headers.
+    
+    Handles load balancers and proxies that set X-Forwarded-For.
+    Falls back to REMOTE_ADDR if that header isn't present.
     """
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
@@ -34,7 +37,10 @@ def get_client_ip(request) -> str:
 
 def validate_password_strength(password: str) -> str:
     """
-    Validate password strength beyond Django's default validation.
+    Check password meets security requirements.
+    
+    Requires 12+ characters with uppercase, lowercase, numbers, and symbols.
+    Rejects common patterns like repeated characters and sequences.
     """
     # Django's built-in validation
     try:
@@ -69,9 +75,7 @@ def validate_password_strength(password: str) -> str:
 
 
 def create_audit_log(user, action: str, details: str, ip_address: str):
-    """
-    Create an audit log entry for security-relevant actions.
-    """
+    """Log security-relevant user actions for compliance and monitoring."""
     from apps.audit.models import AuditLog
     
     try:
@@ -90,7 +94,10 @@ def create_audit_log(user, action: str, details: str, ip_address: str):
 
 def validate_aws_identifier(identifier: str, identifier_type: str = 'general') -> str:
     """
-    Validate AWS resource identifiers to prevent injection attacks.
+    Validate AWS resource names to prevent injection attacks.
+    
+    Checks format and length constraints for regions, profiles, account IDs.
+    Only allows safe characters that can't break shell commands.
     """
     if not identifier:
         raise ValueError(f"AWS {identifier_type} identifier cannot be empty")
@@ -126,7 +133,10 @@ def validate_aws_identifier(identifier: str, identifier_type: str = 'general') -
 
 def sanitize_filename(filename: str) -> str:
     """
-    Sanitize filename to prevent directory traversal and other attacks.
+    Clean filename to prevent directory traversal attacks.
+    
+    Removes path separators and limits to safe characters.
+    Prevents hidden files and enforces reasonable length limits.
     """
     if not filename:
         raise ValueError("Filename cannot be empty")
@@ -150,7 +160,10 @@ def sanitize_filename(filename: str) -> str:
 
 def validate_json_structure(data: dict, required_fields: list, max_depth: int = 5) -> bool:
     """
-    Validate JSON structure to prevent complex object attacks.
+    Check JSON structure to prevent complex object attacks.
+    
+    Limits nesting depth and verifies required fields are present.
+    Helps prevent memory exhaustion from deeply nested objects.
     """
     def check_depth(obj, current_depth=0):
         if current_depth > max_depth:
@@ -178,17 +191,13 @@ def validate_json_structure(data: dict, required_fields: list, max_depth: int = 
 
 
 def generate_secure_token(length: int = 32) -> str:
-    """
-    Generate a cryptographically secure random token.
-    """
+    """Generate cryptographically secure random token for sessions and keys."""
     import secrets
     return secrets.token_urlsafe(length)
 
 
 def rate_limit_key_generator(group, request):
-    """
-    Generate rate limiting keys based on user and IP.
-    """
+    """Generate rate limiting keys based on authenticated user or IP address."""
     if request.user.is_authenticated:
         return f"{group}:user:{request.user.id}"
     else:

@@ -1,5 +1,5 @@
 """
-Authentication models with role-based access control.
+User authentication models with security controls.
 """
 from django.contrib.auth.models import AbstractUser, Permission
 from django.db import models
@@ -8,7 +8,7 @@ import uuid
 
 
 class User(AbstractUser):
-    """Extended user model with additional security fields."""
+    """User model with account lockout and MFA support."""
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
@@ -31,25 +31,25 @@ class User(AbstractUser):
         ]
     
     def is_account_locked(self):
-        """Check if account is currently locked."""
+        """Return True if account is currently locked due to failed login attempts."""
         if self.account_locked_until:
             return timezone.now() < self.account_locked_until
         return False
     
     def lock_account(self, duration_minutes=30):
-        """Lock account for specified duration."""
+        """Lock account after too many failed login attempts."""
         self.account_locked_until = timezone.now() + timezone.timedelta(minutes=duration_minutes)
         self.save(update_fields=['account_locked_until'])
     
     def unlock_account(self):
-        """Unlock account and reset failed attempts."""
+        """Remove account lock and reset failure counter."""
         self.account_locked_until = None
         self.failed_login_attempts = 0
         self.save(update_fields=['account_locked_until', 'failed_login_attempts'])
 
 
 class Role(models.Model):
-    """Role model for RBAC implementation."""
+    """Permission groups for different user types."""
     
     name = models.CharField(max_length=50, unique=True)
     description = models.TextField()
@@ -61,7 +61,7 @@ class Role(models.Model):
 
 
 class UserRole(models.Model):
-    """User role assignment with optional resource-level permissions."""
+    """Links users to roles with optional resource restrictions."""
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='role_assignments')
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
@@ -80,7 +80,7 @@ class UserRole(models.Model):
 
 
 class LoginAttempt(models.Model):
-    """Track login attempts for security monitoring."""
+    """Log every login attempt for security analysis."""
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     email = models.EmailField()
@@ -99,7 +99,7 @@ class LoginAttempt(models.Model):
 
 
 class MFADevice(models.Model):
-    """Track MFA device registration and usage."""
+    """User's registered two-factor authentication devices."""
     
     DEVICE_TYPES = [
         ('totp', 'TOTP (Authenticator App)'),

@@ -1,5 +1,5 @@
 """
-Task models for background job management and tracking.
+Background task models for FinOps operations.
 """
 from django.db import models
 from django.contrib.auth import get_user_model
@@ -12,7 +12,7 @@ User = get_user_model()
 
 
 class FinOpsTask(models.Model):
-    """Background task for FinOps CLI operations."""
+    """Tracks CLI operations running in background."""
     
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -87,29 +87,29 @@ class FinOpsTask(models.Model):
         return f"{self.command_type} - {self.status} - {self.created_at}"
     
     def save(self, *args, **kwargs):
-        """Override save to set expiration time."""
+        """Set expiration time if not already set."""
         if not self.expires_at:
             # Tasks expire 24 hours after creation
             self.expires_at = timezone.now() + timezone.timedelta(hours=24)
         super().save(*args, **kwargs)
     
     def is_expired(self):
-        """Check if task has expired."""
+        """Return True if task results have expired."""
         return timezone.now() > self.expires_at
     
     def can_be_cancelled(self):
-        """Check if task can be cancelled."""
+        """Return True if task is still running and can be stopped."""
         return self.status in ['pending', 'running']
     
     def can_be_retried(self):
-        """Check if task can be retried."""
+        """Return True if failed task hasn't exceeded retry limit."""
         return (
             self.status in ['failed', 'timeout'] and 
             self.retry_count < self.max_retries
         )
     
     def get_duration(self):
-        """Get task duration if completed."""
+        """Return task runtime in seconds."""
         if self.started_at and self.completed_at:
             return (self.completed_at - self.started_at).total_seconds()
         elif self.started_at:
@@ -117,7 +117,7 @@ class FinOpsTask(models.Model):
         return None
     
     def get_progress_display(self):
-        """Get formatted progress display."""
+        """Return user-friendly progress string."""
         if self.status == 'completed':
             return "100%"
         elif self.status == 'failed':
@@ -128,19 +128,19 @@ class FinOpsTask(models.Model):
             return f"{self.progress_percentage}%"
     
     def update_progress(self, percentage, step_description=""):
-        """Update task progress."""
+        """Update progress bar and current step text."""
         self.progress_percentage = min(100, max(0, percentage))
         self.current_step = step_description[:200]
         self.save(update_fields=['progress_percentage', 'current_step'])
     
     def mark_started(self):
-        """Mark task as started."""
+        """Change status to running and record start time."""
         self.status = 'running'
         self.started_at = timezone.now()
         self.save(update_fields=['status', 'started_at'])
     
     def mark_completed(self, result_file=None, result_data=None):
-        """Mark task as completed."""
+        """Mark task as successfully finished."""
         self.status = 'completed'
         self.completed_at = timezone.now()
         self.progress_percentage = 100
@@ -156,7 +156,7 @@ class FinOpsTask(models.Model):
         ])
     
     def mark_failed(self, error_message, error_code=""):
-        """Mark task as failed."""
+        """Mark task as failed with error details."""
         self.status = 'failed'
         self.completed_at = timezone.now()
         self.error_message = error_message[:5000]  # Limit error message length
@@ -168,7 +168,7 @@ class FinOpsTask(models.Model):
 
 
 class TaskQueue(models.Model):
-    """Task queue management for controlling concurrent executions."""
+    """Controls how many tasks can run simultaneously."""
     
     name = models.CharField(max_length=100, unique=True)
     max_concurrent_tasks = models.IntegerField(default=5)
@@ -186,25 +186,25 @@ class TaskQueue(models.Model):
         return f"{self.name} ({self.current_running_tasks}/{self.max_concurrent_tasks})"
     
     def can_accept_task(self):
-        """Check if queue can accept a new task."""
+        """Return True if queue has capacity for another task."""
         return (
             self.is_active and 
             self.current_running_tasks < self.max_concurrent_tasks
         )
     
     def increment_running_tasks(self):
-        """Increment running task counter."""
+        """Add one to the running task counter."""
         self.current_running_tasks += 1
         self.save(update_fields=['current_running_tasks'])
     
     def decrement_running_tasks(self):
-        """Decrement running task counter."""
+        """Subtract one from the running task counter."""
         self.current_running_tasks = max(0, self.current_running_tasks - 1)
         self.save(update_fields=['current_running_tasks'])
 
 
 class TaskNotification(models.Model):
-    """Task completion notifications."""
+    """Sends notifications when tasks complete."""
     
     NOTIFICATION_TYPES = [
         ('email', 'Email'),
@@ -232,7 +232,7 @@ class TaskNotification(models.Model):
 
 
 class TaskSchedule(models.Model):
-    """Scheduled task execution."""
+    """Recurring task execution rules."""
     
     FREQUENCY_CHOICES = [
         ('once', 'Run Once'),
@@ -270,7 +270,7 @@ class TaskSchedule(models.Model):
         return f"{self.name} - {self.frequency}"
     
     def calculate_next_run(self):
-        """Calculate next execution time."""
+        """Figure out when this task should run again."""
         from datetime import timedelta
         
         if self.frequency == 'once':
@@ -286,7 +286,7 @@ class TaskSchedule(models.Model):
         return timezone.now()
     
     def update_next_run(self):
-        """Update next run time after execution."""
+        """Set the next scheduled execution time."""
         self.last_run = timezone.now()
         self.next_run = self.calculate_next_run()
         
@@ -297,7 +297,7 @@ class TaskSchedule(models.Model):
 
 
 class TaskMetrics(models.Model):
-    """Task execution metrics and analytics."""
+    """Hourly statistics about task execution."""
     
     # Time period
     date = models.DateField()

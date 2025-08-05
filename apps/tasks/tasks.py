@@ -1,5 +1,5 @@
 """
-Celery tasks for secure background execution of FinOps CLI commands.
+Background tasks for running FinOps CLI commands.
 """
 import os
 import logging
@@ -19,16 +19,10 @@ logger = logging.getLogger('finops_dashboard.tasks')
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def execute_finops_command(self, task_uuid: str, command_type: str, params: Dict, user_id: str):
     """
-    Execute FinOps CLI command as background task with comprehensive error handling.
+    Run FinOps CLI command in background with retry logic.
     
-    Args:
-        task_uuid: UUID of the FinOpsTask instance
-        command_type: Type of command ('dashboard', 'audit', 'trend')
-        params: Command parameters
-        user_id: User ID for audit logging
-        
-    Returns:
-        Dict: Task execution result
+    Validates credentials, executes the command safely, and processes results.
+    Retries up to 3 times on failure with exponential backoff.
     """
     task_instance = None
     
@@ -169,7 +163,7 @@ def execute_finops_command(self, task_uuid: str, command_type: str, params: Dict
 
 @shared_task
 def cleanup_expired_tasks():
-    """Clean up expired tasks and associated files."""
+    """Remove old completed tasks and their associated files."""
     try:
         cutoff_time = timezone.now()
         
@@ -216,7 +210,7 @@ def cleanup_expired_tasks():
 
 @shared_task
 def rotate_aws_credentials():
-    """Rotate AWS credentials that need rotation."""
+    """Automatically rotate AWS credentials that are configured for rotation."""
     try:
         from apps.profiles.models import AWSCredential
         
@@ -255,7 +249,7 @@ def rotate_aws_credentials():
 
 @shared_task
 def generate_task_metrics():
-    """Generate hourly task metrics for analytics."""
+    """Create hourly statistics about task execution for monitoring."""
     try:
         current_time = timezone.now()
         current_date = current_time.date()
@@ -358,7 +352,7 @@ def generate_task_metrics():
 
 @shared_task
 def send_task_notifications(task_uuid: str):
-    """Send notifications for completed tasks."""
+    """Send email or webhook notifications when tasks complete."""
     try:
         task_instance = FinOpsTask.objects.get(id=task_uuid)
         
@@ -410,7 +404,7 @@ def send_task_notifications(task_uuid: str):
 
 
 def _update_task_metrics(task_instance, success: bool):
-    """Update task metrics after execution."""
+    """Record resource usage and performance data after task completion."""
     try:
         # Update resource usage if available
         if hasattr(task_instance, 'memory_usage_mb') and not task_instance.memory_usage_mb:
@@ -430,7 +424,7 @@ def _update_task_metrics(task_instance, success: bool):
 
 
 def _send_email_notification(notification, task_instance):
-    """Send email notification for task completion."""
+    """Send email about task completion or failure."""
     try:
         from django.core.mail import send_mail
         
@@ -457,7 +451,7 @@ def _send_email_notification(notification, task_instance):
 
 
 def _send_webhook_notification(notification, task_instance):
-    """Send webhook notification for task completion."""
+    """Post task completion status to webhook URL."""
     try:
         import requests
         
