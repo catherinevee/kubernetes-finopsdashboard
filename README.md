@@ -1,16 +1,52 @@
 # FinOps Dashboard Web Interface
 
-## Overview
+## Purpose and Overview
 
-A Django web application that wraps the AWS FinOps Dashboard CLI tool with a secure web interface. Teams can manage AWS costs and resources without direct command-line access, while maintaining full audit trails for compliance requirements.
+The FinOps Dashboard is a secure Django web application that provides enterprise teams with web-based access to AWS financial operations and cost management capabilities. This application eliminates the need for direct command-line access while maintaining comprehensive audit trails for compliance requirements.
 
-Built on Django 4.2+ with PostgreSQL, Redis, and Celery for background processing. Authentication uses OAuth2/JWT with mandatory MFA. The interface uses Bootstrap 5 for compatibility across enterprise environments.
+### What This Application Does
 
-## What This Application Does
+The primary purpose of this application is to democratize AWS cost management across enterprise teams by providing a secure, web-based interface to AWS FinOps CLI tools. The application enables:
+
+**Cost Visibility**: Real-time AWS spending monitoring across multiple accounts and regions with interactive dashboards and detailed cost breakdowns.
+
+**Resource Optimization**: Automated identification of idle resources, rightsizing recommendations for EC2 and RDS instances, and Reserved Instance optimization analysis.
+
+**Financial Governance**: Role-based access control ensuring appropriate team members can view relevant cost data while maintaining security boundaries and audit compliance.
+
+**Operational Efficiency**: Background processing of long-running cost analysis tasks with progress tracking and automated report generation.
+
+### How It Works
+
+The application operates as a secure wrapper around AWS FinOps CLI commands, processing requests through multiple layers:
+
+1. **Authentication Layer**: Users authenticate via OAuth2/JWT with mandatory multi-factor authentication (MFA) using TOTP or SMS verification.
+
+2. **Authorization Layer**: Role-based access control determines which AWS profiles and cost data each user can access based on their organizational permissions.
+
+3. **Request Processing**: User requests for cost analysis or resource optimization are validated and queued for background processing using Celery task queues.
+
+4. **Secure CLI Execution**: Background workers execute AWS CLI commands in isolated environments with encrypted credential management and comprehensive input validation to prevent injection attacks.
+
+5. **Data Presentation**: Results are processed, cached, and presented through responsive Bootstrap 5 interfaces with interactive charts and exportable reports.
+
+6. **Audit and Compliance**: All user actions, CLI executions, and data access are logged with tamper-evident audit trails for compliance and security monitoring.
+
+### Core Technology Stack
+
+Built on Django 4.2+ with PostgreSQL for data persistence, Redis for caching and task queues, and Celery for background processing. The interface uses Bootstrap 5 for cross-browser compatibility in enterprise environments. Deployment supports both Docker Compose for development and Kubernetes for production scaling.
+
+### Key Benefits for Teams
+
+**Finance Teams**: Access AWS cost data without requiring AWS console permissions, generate automated monthly reports with team-based cost allocation, and set up budget monitoring with variance tracking.
+
+**Engineering Teams**: Review resource utilization and performance metrics, receive rightsizing recommendations, and identify optimization opportunities without direct AWS access.
+
+**Management**: Monitor high-level cost KPIs and trends, track FinOps initiative ROI, and make data-driven cloud investment decisions through executive dashboards.
+
+## Core Functionality
 
 ### Primary Purpose
-Provides web access to AWS FinOps CLI functionality for teams that need:
-
 Provides web access to AWS FinOps CLI functionality for teams that need:
 
 - Cost visualization across multiple AWS accounts and regions
